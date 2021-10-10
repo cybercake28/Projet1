@@ -94,7 +94,7 @@ class Plateau :
             if( self.tab[l,c-1] != 0 ):
                 continue
             else:
-                self.tab[l,c-1] = joueur
+                self.tab[l,c-1] = joueur.id
                 return
         if( c+1 < self.c -1 ):
             self.play(c+1,joueur)
@@ -164,10 +164,35 @@ class Joueur :
         self.nb_coup+=1
         return c
 
+class Etat :
+
+    def __init__(self, plateau):
+        """
+        Fonction permmettant d initialiser un etat a partir du plateau 
+        """
+        self.chaineEtat = plateau.tab.tobytes()
+        
+        if(len(self.chaineEtat)%2 == 0):
+            self.joueurQuiJoue = Joueur(1)
+        else :
+            self.joueurQuiJoue = Joueur(-1)
+
+    def action(self):
+        """
+        Fonction permettant de faire jouer un etat
+        """
+        tupleLibre = (plateau[x,:]==0).argmax()
+        print (tupleLibre)
+
 plateau = Plateau( ligne, colonne )
 joueurRouge = Joueur(1)
 joueurBleu = Joueur(-1)
-plateau.distribution(joueurRouge, joueurBleu, 10)
+etat1 = Etat(plateau)
+plateau.play(0,joueurRouge)
+plateau.play(2,joueurBleu)
+etat2 = Etat(plateau)
+#plateau.affichePlateau()
+# plateau.distribution(joueurRouge, joueurBleu, 10)
 
 
 
