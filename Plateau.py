@@ -19,13 +19,15 @@ listwin =[]
 #     Retourner l’action avec la meilleure probabilité de victoire
 class Plateau :
 
-    def __init__(self, L, l):
+    def __init__(self, L, l, j1, j2):
         """
         Fonction permettant d'initialiser le plateau du jeu
         """
         self.tab = np.zeros((L,l))
-        self.l = ligne
-        self.c = colonne
+        self.l = l
+        self.c = L
+        self.Joueur1 = Joueur(1)
+        self.Joueur2 = Joueur(-1)
         self.j1 = []
         self.j2 = []
 
@@ -90,14 +92,8 @@ class Plateau :
         """
         fonction permettant de faire jouer un joueur a la colonne c si c est possible
         """
-        for l in range(ligne-1, -1, -1 ):
-            if( self.tab[l,c-1] != 0 ):
-                continue
-            else:
-                self.tab[l,c-1] = joueur.id
-                return
-        if( c+1 < self.c -1 ):
-            self.play(c+1,joueur)
+        play_joueur(self, joueur)
+
 
     def is_finished(self):
         """
@@ -111,32 +107,32 @@ class Plateau :
                     return False
         return True
 
-    def run(self, joueur1, joueur2):
+    def run(self):
         """
         Tant que le jeu n'est pas fini le jeu continue
         """
         cpt = 0
         while not self.is_finished() :
             if cpt % 2 == 0 :
-                stock = joueur1.play_joueur(self,joueur1)
-                self.play( stock, joueur1.id )
+                stock = self.joueur1.play_joueur(self,self.joueur1)
+                self.play( stock, self.joueur1.id )
                 if( self.is_finished() ):
-                    (self.j1).append(joueur1.nb_coup)
+                    (self.j1).append(self.joueur1.nb_coup)
                     (self.j2).append(0) ##############
                     return 1
                 cpt+=1
             else:
-                stock = joueur2.play_joueur(self,joueur2)
-                self.play( stock, joueur2.id )
+                stock = self.joueur2.play_joueur(self,self.joueur2)
+                self.play( stock, self.joueur2.id )
                 if( self.is_finished() ):
-                    (self.j2).append(joueur2.nb_coup)
+                    (self.j2).append(self.joueur2.nb_coup)
                     (self.j1).append(0) ################
                     return -1
                 cpt+=1
 
     def distribution(self, joueur1, joueur2, nb_parties):
         for i in range(0, nb_parties):
-            self.run(joueur1, joueur2)
+            self.run()
             self.reset()
             joueur1.reset_nb_coup()
             joueur2.reset_nb_coup()
@@ -170,9 +166,10 @@ class Etat :
         """
         Fonction permmettant d initialiser un etat a partir du plateau 
         """
-        self.chaineEtat = plateau.tab.tobytes()
+        self.tabEtat = plateau.tab
+        self.nbcoup = plateau.Joueur1.nb_coup + plateau.Joueur2.nb_coup
         
-        if(len(self.chaineEtat)%2 == 0):
+        if (self.nbcoup)%2 == 0:
             self.joueurQuiJoue = Joueur(1)
         else :
             self.joueurQuiJoue = Joueur(-1)
@@ -181,16 +178,19 @@ class Etat :
         """
         Fonction permettant de faire jouer un etat
         """
-        tupleLibre = (plateau[x,:]==0).argmax()
-        print (tupleLibre)
+        for x in self.tabEtat:
+            return (plateau[x,:]==0).argmax()
 
-plateau = Plateau( ligne, colonne )
 joueurRouge = Joueur(1)
 joueurBleu = Joueur(-1)
+plateau = Plateau( ligne, colonne, joueurRouge, joueurBleu)
 etat1 = Etat(plateau)
+print(etat1.nbcoup)
 plateau.play(0,joueurRouge)
 plateau.play(2,joueurBleu)
 etat2 = Etat(plateau)
+print(etat2.nbcoup)
+
 #plateau.affichePlateau()
 # plateau.distribution(joueurRouge, joueurBleu, 10)
 
