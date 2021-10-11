@@ -2,34 +2,33 @@ import numpy as np
 import random as rnd
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap, LinearSegmentedColormap
+import operator
+from copy import copy, deepcopy
 
 ligne = 6
 colonne = 7
-listwin =[]
+listwin = []
 
+# nb de parties à simuler
+nb_parties = 1000
 
-# Monte Carlo play(etat,joueur):
-#     initialiser les récompenses des actions à 0
-#       (elles représentent la moyenne des victoires par action)
-#     Pour i de 1 à N:
-#         choisir une action a au hasard
-#         Tant que la partie n’est pas finie:
-#             jouer les deux joueurs au hasard
-#         mettre à jour la récompense de l’action a en fonction du résultat
-#     Retourner l’action avec la meilleure probabilité de victoire
+# nombre de partie fictivce au Monte Carlo afin de determiner le coup à jouer
+nb_Monte_carlo = 100
+
 class Plateau :
 
-    def __init__(self, L, l, j1, j2):
+    def __init__(self, l, c):
         """
         Fonction permettant d'initialiser le plateau du jeu
         """
-        self.tab = np.zeros((L,l))
-        self.l = l
-        self.c = L
-        self.Joueur1 = Joueur(1)
-        self.Joueur2 = Joueur(-1)
-        self.j1 = []
-        self.j2 = []
+        self.tab = np.zeros((l,c))
+        self.l = ligne
+        self.c = colonne
+        #lj1 est la liste du nombre de coup joué par le joueur1 lors d'une de ses victoires même chose pour lj2 mais pour le joueur2
+        self.lj1 = []
+        self.lj2 = []
+        self.nb_parties_nulles = 0
+        self.listwin = self.listWinInit()
 
     def affichePlateau(self):
         """
@@ -74,9 +73,7 @@ class Plateau :
         """
         Fonction permettant de savoir si le jeu actuel a un gagnant ou non
         """
-        listwin = self.listWinInit()
-        tmp = 0
-        for tup in listwin:
+        for tup in self.listwin:
             tup1 = tup[0]
             tup2 = tup[1]
             tup3 = tup[2]
@@ -90,62 +87,146 @@ class Plateau :
 
     def play(self, c, joueur):
         """
-        fonction permettant de faire jouer un joueur a la colonne c si c est possible
+        fonction permettant de faire jouer un joueur a la colonne c
         """
-        play_joueur(self, joueur)
 
+        for l in range(ligne-1, -1, -1 ):
+            if( self.tab[l,c-1] != 0 ):
+                continue
+            else:
+                self.tab[l,c-1] = joueur
+                return
+        if( c+1 < self.c -1 ):
+            self.play(c+1,joueur)
 
     def is_finished(self):
         """
         fonction qui parcours le plateau pour savoir si la partie est finie ou non
         """
         if( self.has_won() ):
-            return True
+            return 1 # un joueur a gagne
         for l in range(0 , self.l):
             for c in range(0, self.c):
                 if( self.tab[l,c] == 0 ):
-                    return False
-        return True
+                    return -1 # le jeu continue personne n'a gagne
+        return 0 # impossible de continuer de jouer
 
-    def run(self):
-        """
-        Tant que le jeu n'est pas fini le jeu continue
-        """
+    def run(self, joueur1, joueur2):
         cpt = 0
-        while not self.is_finished() :
+        cpt_coup1 = 0
+        cpt_coup2 = 0
+        while self.is_finished() == -1 :
             if cpt % 2 == 0 :
-                stock = self.joueur1.play_joueur(self,self.joueur1)
-                self.play( stock, self.joueur1.id )
-                if( self.is_finished() ):
-                    (self.j1).append(self.joueur1.nb_coup)
-                    (self.j2).append(0) ##############
+                stock = joueur1.play_joueur(self,joueur1)
+                cpt_coup1 += 1
+                self.play( stock, joueur1.id )
+                if( self.is_finished() == 1 ):
+                    joueur1.nb_coup = cpt_coup1
+                    joueur2.nb_coup = cpt_coup2
+                    (self.lj1).append((joueur1.nb_coup))
                     return 1
                 cpt+=1
             else:
-                stock = self.joueur2.play_joueur(self,self.joueur2)
-                self.play( stock, self.joueur2.id )
-                if( self.is_finished() ):
-                    (self.j2).append(self.joueur2.nb_coup)
-                    (self.j1).append(0) ################
+                stock = joueur2.play_joueur(self,joueur2)
+                cpt_coup2 += 1
+                self.play( stock, joueur2.id )
+                if( self.is_finished()  == 1 ):
+                    joueur1.nb_coup = cpt_coup1
+                    joueur2.nb_coup = cpt_coup2
+                    (self.lj2).append((joueur2.nb_coup))
                     return -1
                 cpt+=1
+        self.nb_parties_nulles+=1
+        return 0
 
     def distribution(self, joueur1, joueur2, nb_parties):
         for i in range(0, nb_parties):
-            self.run()
+            self.run(joueur1, joueur2)
             self.reset()
             joueur1.reset_nb_coup()
             joueur2.reset_nb_coup()
-        print(self.j1)
-        print(self.j2)
+
+    # partie entre deux joueur utilisant le monte carlo
+    def run_double_Monte_Carlo(self, joueur1, joueur2):
+        cpt = 0
+        cpt_coup1 = 0
+        cpt_coup2 = 0
+
+        # partie sans gagnant mais encore jouable
+        while self.is_finished() == -1 :
+            if cpt % 2 == 0 :
+                stock = joueur1.monte_carlo_play(self, joueur2)
+                cpt_coup1 += 1
+                self.play( stock, joueur1.id )
+                #La partie s'est terminé sur une victoire et apres le coup de ce joueur
+                if( self.is_finished() == 1 ):
+                    joueur1.nb_coup = cpt_coup1
+                    joueur2.nb_coup = cpt_coup2
+                    (self.lj1).append((joueur1.nb_coup))
+                    return 1
+                cpt+=1
+            else:
+                stock = joueur2.monte_carlo_play(self, joueur1)
+                cpt_coup2 += 1
+                self.play( stock, joueur2.id )
+                #La partie s'est terminé sur une victoire et apres le coup de ce joueur
+                if( self.is_finished()  == 1 ):
+                    joueur1.nb_coup = cpt_coup1
+                    joueur2.nb_coup = cpt_coup2
+                    (self.lj2).append((joueur2.nb_coup))
+                    return -1
+                cpt+=1
+        self.nb_parties_nulles+=1
+        return 0
+
+    def run_monteVSrandom(self, j_monte, j_random):
+        cpt = 0
+        cpt_coup1 = 0
+        cpt_coup2 = 0
+        # partie sans gagnant mais encore jouable
+        while self.is_finished() == -1 :
+            if cpt % 2 == 0 :
+                stock = j_monte.monte_carlo_play(self, j_random)
+                cpt_coup1 += 1
+                self.play( stock, j_monte.id )
+                if( self.is_finished() == 1 ):
+                    j_monte.nb_coup = cpt_coup1
+                    j_random.nb_coup = cpt_coup2
+                    (self.lj1).append((j_monte.nb_coup))
+                    return 1
+                cpt+=1
+            else:
+                stock = j_random.play_joueur(self, j_random)
+                cpt_coup2 += 1
+                self.play( stock, j_random.id )
+                if( self.is_finished()  == 1 ):
+                    j_monte.nb_coup = cpt_coup1
+                    j_random.nb_coup = cpt_coup2
+                    (self.lj2).append((j_random.nb_coup))
+                    return -1
+                cpt+=1
+
+        self.nb_parties_nulles+=1
+        return 0
+
+    def distribution_monteVSmonte(self, joueur1, joueur2, nb_parties):
+        for i in range(0, nb_parties):
+            self.run_double_Monte_Carlo(joueur1, joueur2)
+            self.reset()
+            joueur1.reset_nb_coup()
+            joueur2.reset_nb_coup()
+
+    def distribution_monteVSrandom(self, monte, random, nb_parties):
+        for i in range(0, nb_parties):
+            self.run_monteVSrandom(monte, random)
+            self.reset()
+            monte.reset_nb_coup()
+            random.reset_nb_coup()
 
 
 class Joueur :
 
     def __init__(self, x):
-        """
-        Fonction permettant d'initialiser un joueur avec pour jeton x
-        """
         self.id = x
         self.nb_coup = 0
 
@@ -153,48 +234,96 @@ class Joueur :
         self.nb_coup = 0
 
     def play_joueur(self, plateau, joueur):
-        """
-        Fonction permettant de faire jouer un joueur
-        """
         c = rnd.randint(0, (plateau.c)-1)
-        self.nb_coup+=1
         return c
 
-class Etat :
+    def monte_carlo_play(self, etat, joueuradverse):
+        dico = {}
 
-    def __init__(self, plateau):
-        """
-        Fonction permmettant d initialiser un etat a partir du plateau 
-        """
-        self.tabEtat = plateau.tab
-        self.nbcoup = plateau.Joueur1.nb_coup + plateau.Joueur2.nb_coup
-        
-        if (self.nbcoup)%2 == 0:
-            self.joueurQuiJoue = Joueur(1)
-        else :
-            self.joueurQuiJoue = Joueur(-1)
+        #on fait une copie du plateau original
+        plat = deepcopy(etat)
 
-    def action(self):
-        """
-        Fonction permettant de faire jouer un etat
-        """
-        for x in self.tabEtat:
-            return (plateau[x,:]==0).argmax()
+        for i in range(0, nb_Monte_carlo):
+            plat = deepcopy(etat)
+            #on recupere un numéro de colonne aléatoire
+            a = joueuradverse.play_joueur(plateau, self)
+            #si cette action nous permet de gagner la partie sur le même plateau de jeu alors on ajoute cette action au dictionnaire ou on incrémente son compteur 
+            stock = plat.run(self,joueuradverse)
+            if( stock  == self.id ):
+                if a in dico:
+                    dico[a] = dico[a]+1
+                else:
+                    dico[a] = 1
+        #verification que le dictionnaire n'est pas vide
+        if not dico : 
+            return rnd.randint(0, (etat.c)-1)
 
-joueurRouge = Joueur(1)
-joueurBleu = Joueur(-1)
-plateau = Plateau( ligne, colonne, joueurRouge, joueurBleu)
-etat1 = Etat(plateau)
-print(etat1.nbcoup)
-plateau.play(0,joueurRouge)
-plateau.play(2,joueurBleu)
-etat2 = Etat(plateau)
-print(etat2.nbcoup)
-
-#plateau.affichePlateau()
-# plateau.distribution(joueurRouge, joueurBleu, 10)
+        return max(dico, key=dico.get)
 
 
+#---------------------------------------------------------------- PARTIE : 1 ----------------------------------------------------------------
+# plateau = Plateau( ligne, colonne )
+# joueur1 = Joueur(1)
+# joueur2 = Joueur(-1)
+
+# #on simule les parties tout en sauvegardant le nombre de coups joues du gagnant
+# plateau.distribution(joueur1, joueur2, nb_parties)
+
+#listes avec le nombre de coup de chaque victoire
+# list_tot = plateau.lj1 + plateau.lj2
+
+# nb_win_total = len(list_tot)
+# nb_nulle = plateau.nb_parties_nulles
+# nb_win_j1 = len(plateau.lj1)
+# nb_win_j2 = len(plateau.lj2)
+
+# print("nb win total : " + str(nb_win_total))
+# print("nb no win : " + str(nb_nulle))
+# print("nb win j1 : " + str(nb_win_j1))
+# print("nb win j2 : " + str(nb_win_j2))
+
+# #Deux joueurs hist
+# plt.hist(list_tot,  bins=50)
+# plt.show()
+
+# #joueur 1 hist
+# plt.hist(plateau.lj1,  bins=50)
+# plt.show()
+
+# #joueur 2 hist
+# plt.hist(plateau.lj2, bins=50)
+# plt.show()
 
 
+#---------------------------------------------------------------- PARTIE : 2 ----------------------------------------------------------------
+plateau = Plateau(ligne, colonne)
+joueur1 = Joueur(1)
+joueur2 = Joueur(-1)
 
+# Distribution joueur monte carlo vs joueur à tirage aléatoire
+plateau.distribution_monteVSrandom(joueur1, joueur2, nb_parties)
+
+# listes avec le nombre de coup de chaque victoire
+list_tot = plateau.lj1 + plateau.lj2
+
+nb_win_total = len(list_tot)
+nb_nulle = plateau.nb_parties_nulles
+nb_win_j1 = len(plateau.lj1)
+nb_win_j2 = len(plateau.lj2)
+
+print("nb win total : " + str(nb_win_total))
+print("nb no win : " + str(nb_nulle))
+print("nb win j1 : " + str(nb_win_j1))
+print("nb win j2 : " + str(nb_win_j2))
+
+#Deux joueurs hist
+plt.hist(list_tot,  bins=50)
+plt.show()
+
+#joueur 1 hist
+plt.hist(plateau.lj1,  bins=50)
+plt.show()
+
+#joueur 2 hist
+plt.hist(plateau.lj2, bins=50)
+plt.show()
