@@ -236,88 +236,88 @@ class Plateau :
             monte.reset_nb_coup()
             random.reset_nb_coup()
 
-    #### Partie 3 ####
-    def jouer_levier(self ,L, a ): # Renvoie le résultat d'un tirage de bernoulli
-        if a >= len(L):
-            print("probleme !")
-            return
-        # On decide de raisonner sur la probabilité de succès plutot que celle de l'echec
-        r = L[a] # ( rendement )
-        tirage = uniform(0,1) # tirage nombre réel entre 0 et 1
-        if tirage <= r : # succès
-            return 1
-        else : # echec tirage > r qui est le randement
-            return 0
+#### Partie 3 ####
+def jouer_levier(ListLevier, a ): # Renvoie le résultat d'un tirage de bernoulli
+    if a >= len(ListLevier):
+        print("probleme !")
+        return
+    # On decide de raisonner sur la probabilité de succès plutot que celle de l'echec
+    r = ListLevier[a] # ( rendement )
+    tirage = uniform(0,1) # tirage nombre réel entre 0 et 1
+    if tirage <= r : # succès
+        return 1
+    else : # echec tirage > r qui est le randement
+        return 0
 
-    def algo_alea(self, L, nb=0):
-        n = len(L)
-        action = randint(0,n-1)
-        return action
+def algo_alea(ListLevier, nb=0):
+    n = len(ListLevier)
+    action = randint(0,n-1)
+    return action
 
-    def algo_greed(self, L, nb=0):
-        dico = dict() # on crée un dictionnaire vide qui contiendra le nombre de succès (valeur) de chaque action (clé) sur nb*tirage de Bernoulli
-        nb_tirage_tot = len(L)*greed_nb # le nombre de tirage total effectué ( echec ou succès ) quelque soit l'action choisie
-        for i in range(0, len(L)):
-            dico[i] = 0 # on ajoute l'action actuelle "i" avec un nombre de gain initial à 0
-            for x in range(0, greed_nb): # on fait greed_nb tirages de bernoulli
-                dico[i] += self.jouer_levier(L, i) # à chaque tirage on incrémente le compteur du nombre de succès pour l'action i actuelle de 0 ou de 1 selon qu'il y ait succès ou pas
-        for x in dico:
-            dico[x] = dico[x]/nb_tirage_tot # on divise le nombre de succes de chaque action par le nombre de tirages total effectué pour obtenir le rendement de chaque action
-        return max(dico, key=dico.get) # on renvoie l'action ayant le meilleur rendement
+def algo_greed(ListLevier, nb=0):
+    dico = dict() # on crée un dictionnaire vide qui contiendra le nombre de succès (valeur) de chaque action (clé) sur nb*tirage de Bernoulli
+    nb_tirage_tot = len(ListLevier)*greed_nb # le nombre de tirage total effectué ( echec ou succès ) quelque soit l'action choisie
+    for i in range(0, len(ListLevier)):
+        dico[i] = 0 # on ajoute l'action actuelle "i" avec un nombre de gain initial à 0
+        for x in range(0, greed_nb): # on fait greed_nb tirages de bernoulli
+            dico[i] += jouer_levier(ListLevier, i) # à chaque tirage on incrémente le compteur du nombre de succès pour l'action i actuelle de 0 ou de 1 selon qu'il y ait succès ou pas
+    for x in dico:
+        dico[x] = dico[x]/nb_tirage_tot # on divise le nombre de succes de chaque action par le nombre de tirages total effectué pour obtenir le rendement de chaque action
+    return max(dico, key=dico.get) # on renvoie l'action ayant le meilleur rendement
 
-    def algo_e_greed(self, L, nb=0):
-        epsilon = uniform(0,1)
-        dico = dict()
-        nb_tirage_tot = len(L)*greed_nb
-        for i in range(len(L)):
-            dico[i] = 0
-        for x in range(0, greed_nb):
-            rand = uniform(0,1)
-            if rand >= epsilon :
-                dico[self.algo_alea(L)] += 1
-            else :
-                dico[self.algo_greed(L)] += 1
-        for x in dico:
-            dico[x] = dico[x]/nb_tirage_tot
-        return max(dico, key=dico.get)
+def algo_e_greed(ListLevier, nb=0):
+    epsilon = uniform(0,1)
+    dico = dict()
+    nb_tirage_tot = len(ListLevier)*greed_nb
+    for i in range(len(ListLevier)):
+        dico[i] = 0
+    for x in range(0, greed_nb):
+        rand = uniform(0,1)
+        if rand >= epsilon :
+            dico[algo_alea(L)] += 1
+        else :
+            dico[algo_greed(L)] += 1
+    for x in dico:
+        dico[x] = dico[x]/nb_tirage_tot
+    return max(dico, key=dico.get)
 
-    def algo_ucb(self, L, L_played):
-        coup_tot = sum(L_played)
-        dico = dict()
-        nb_tirage_tot = len(L)*greed_nb # le nombre de tirage total effectué ( echec ou succès ) quelque soit l'action
-        # il s'agit ici de reproduire l'algo Greedy car on s'occupe de l'exploitation mais de garder pour chaque action son rendement
-        for i in range(0, len(L)):
-            dico[i] = 0 # on ajoute l'action actuelle "i" avec un nombre de gain initial à 0
-            for x in range(0, greed_nb): # on fait greed_nb tirages de bernoulli
-                # à chaque tirage on incrémente le compteur du nombre de succès pour l'action i actuelle de 0 ou de 1 selon qu'il y est succès ou pas
-                dico[i] += self.jouer_levier(L, i)
-        for i in range(0, len(L)):
-            if L_played[i] <= 0 : # cas ou une action n'a pas du tout été jouée
-                dico[i] = (dico[i]/nb_tirage_tot) + sqrt( ( 2 * log(coup_tot) ) / 1 )
-                continue
-            dico[i] = (dico[i]/nb_tirage_tot) + sqrt( ( 2 * log(coup_tot) ) / L_played[i] ) # (dico[i]/nb_tirage_tot) représentant le rendement de l'action i 
-        return max(dico, key=dico.get)
+def algo_ucb(ListLevier, L_played):
+    coup_tot = sum(L_played)
+    dico = dict()
+    nb_tirage_tot = len(ListLevier)*greed_nb # le nombre de tirage total effectué ( echec ou succès ) quelque soit l'action
+    # il s'agit ici de reproduire l'algo Greedy car on s'occupe de l'exploitation mais de garder pour chaque action son rendement
+    for i in range(0, len(ListLevier)):
+        dico[i] = 0 # on ajoute l'action actuelle "i" avec un nombre de gain initial à 0
+        for x in range(0, greed_nb): # on fait greed_nb tirages de bernoulli
+            # à chaque tirage on incrémente le compteur du nombre de succès pour l'action i actuelle de 0 ou de 1 selon qu'il y est succès ou pas
+            dico[i] += jouer_levier(ListLevier, i)
+    for i in range(0, len(ListLevier)):
+        if L_played[i] <= 0 : # cas ou une action n'a pas du tout été jouée
+            dico[i] = (dico[i]/nb_tirage_tot) + sqrt( ( 2 * log(coup_tot) ) / 1 )
+            continue
+        dico[i] = (dico[i]/nb_tirage_tot) + sqrt( ( 2 * log(coup_tot) ) / L_played[i] ) # (dico[i]/nb_tirage_tot) représentant le rendement de l'action i 
+    return max(dico, key=dico.get)
 
-    def regret(self, L, L_played, T):
-        gain_aleat = 0
-        for i in range(T):
-            gain_aleat += self.jouer_levier(L, self.algo_alea(L))
-        print(gain_aleat)
+def regret(ListLevier, L_played, T):
+    gain_aleat = 0
+    for i in range(T):
+        gain_aleat += jouer_levier(ListLevier, algo_alea(ListLevier))
+    print(gain_aleat)
 
-        gain_greed = 0
-        for i in range(T):
-            gain_greed += self.jouer_levier(L, self.algo_greed(L))
-        print(gain_greed)
+    gain_greed = 0
+    for i in range(T):
+        gain_greed += jouer_levier(ListLevier, algo_greed(ListLevier))
+    print(gain_greed)
 
-        gain_e_greed = 0
-        for i in range(T):
-            gain_e_greed += self.jouer_levier(L, self.algo_e_greed(L))
-        print(gain_e_greed)
+    gain_e_greed = 0
+    for i in range(T):
+        gain_e_greed += jouer_levier(ListLevier, algo_e_greed(ListLevier))
+    print(gain_e_greed)
 
-        gain_ucb = 0
-        for i in range(T):
-            gain_ucb += self.jouer_levier(L, self.algo_ucb(L, L_played))
-        print(gain_ucb)
+    gain_ucb = 0
+    for i in range(T):
+        gain_ucb += jouer_levier(ListLevier, algo_ucb(ListLevier, L_played))
+    print(gain_ucb)
 
 
 class Joueur :
@@ -475,4 +475,4 @@ for i in range(100):
     L_P.append(randint(0,taille_action ))
     taille_action -= 1
 
-plateau.regret(L,L_P,T)
+regret(L,L_P,T)
