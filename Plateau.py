@@ -237,87 +237,192 @@ class Plateau :
             random.reset_nb_coup()
 
 #### Partie 3 ####
-def jouer_levier(ListLevier, a ): # Renvoie le résultat d'un tirage de bernoulli
-    if a >= len(ListLevier):
-        print("probleme !")
-        return
-    # On decide de raisonner sur la probabilité de succès plutot que celle de l'echec
-    r = ListLevier[a] # ( rendement )
-    tirage = uniform(0,1) # tirage nombre réel entre 0 et 1
-    if tirage <= r : # succès
-        return 1
-    else : # echec tirage > r qui est le randement
-        return 0
+class Bandits_manchots:
 
-def algo_alea(ListLevier, nb=0):
-    n = len(ListLevier)
-    action = randint(0,n-1)
-    return action
+    def __init__(self, nb_action, nb_partie, List_modele=0 ):
+        # nb de parties à simuler partie 3
+        self.nb_levier = nb_action
+        if( List_modele == 0 ) : self.L_rendement = l = [random() for i in range(nb_action)]
+        else : self.L_rendement = List_modele
+        self.t = nb_partie
 
-def algo_greed(ListLevier, nb=0):
-    dico = dict() # on crée un dictionnaire vide qui contiendra le nombre de succès (valeur) de chaque action (clé) sur nb*tirage de Bernoulli
-    nb_tirage_tot = len(ListLevier)*greed_nb # le nombre de tirage total effectué ( echec ou succès ) quelque soit l'action choisie
-    for i in range(0, len(ListLevier)):
-        dico[i] = 0 # on ajoute l'action actuelle "i" avec un nombre de gain initial à 0
-        for x in range(0, greed_nb): # on fait greed_nb tirages de bernoulli
-            dico[i] += jouer_levier(ListLevier, i) # à chaque tirage on incrémente le compteur du nombre de succès pour l'action i actuelle de 0 ou de 1 selon qu'il y ait succès ou pas
-    for x in dico:
-        dico[x] = dico[x]/nb_tirage_tot # on divise le nombre de succes de chaque action par le nombre de tirages total effectué pour obtenir le rendement de chaque action
-    return max(dico, key=dico.get) # on renvoie l'action ayant le meilleur rendement
+    #### Partie 3 ####
+    def actu_regret(self, time, count, count_best, l_regret, l_time):
+        l_time.append(time)
+        l_regret.append(count_best-count)
 
-def algo_e_greed(ListLevier, nb=0):
-    epsilon = uniform(0,1)
-    dico = dict()
-    nb_tirage_tot = len(ListLevier)*greed_nb
-    for i in range(len(ListLevier)):
-        dico[i] = 0
-    for x in range(0, greed_nb):
-        rand = uniform(0,1)
-        if rand >= epsilon :
-            dico[algo_alea(L)] += 1
+
+    def gain_binaire(self ,L, a ): # Renvoie le résultat d'un tirage de bernoulli
+        r = L[a] # ( rendement )
+        tirage = uniform(0,1) # tirage nombre réel entre 0 et 1
+        if tirage <= r : # succès
+            return 1
         else :
-            dico[algo_greed(L)] += 1
-    for x in dico:
-        dico[x] = dico[x]/nb_tirage_tot
-    return max(dico, key=dico.get)
+            return 0
 
-def algo_ucb(ListLevier, L_played):
-    coup_tot = sum(L_played)
-    dico = dict()
-    nb_tirage_tot = len(ListLevier)*greed_nb # le nombre de tirage total effectué ( echec ou succès ) quelque soit l'action
-    # il s'agit ici de reproduire l'algo Greedy car on s'occupe de l'exploitation mais de garder pour chaque action son rendement
-    for i in range(0, len(ListLevier)):
-        dico[i] = 0 # on ajoute l'action actuelle "i" avec un nombre de gain initial à 0
-        for x in range(0, greed_nb): # on fait greed_nb tirages de bernoulli
-            # à chaque tirage on incrémente le compteur du nombre de succès pour l'action i actuelle de 0 ou de 1 selon qu'il y est succès ou pas
-            dico[i] += jouer_levier(ListLevier, i)
-    for i in range(0, len(ListLevier)):
-        if L_played[i] <= 0 : # cas ou une action n'a pas du tout été jouée
-            dico[i] = (dico[i]/nb_tirage_tot) + sqrt( ( 2 * log(coup_tot) ) / 1 )
-            continue
-        dico[i] = (dico[i]/nb_tirage_tot) + sqrt( ( 2 * log(coup_tot) ) / L_played[i] ) # (dico[i]/nb_tirage_tot) représentant le rendement de l'action i 
-    return max(dico, key=dico.get)
+    def algo_alea(self, L_recompense, cpt_levier = {} ): # L est vide et contient le rendement de chaque action
+        l_time = list()
+        timer = 0
+        l_regret = list()
+        count_best = 0 # compteur de meilleur cas à t
+        count = 0 # compteur action random au temps tirage
+        best_indice = np.argmax(self.L_rendement) # levier ayant le meilleur rendement
+        for i in range(0, self.t):
+            count_best += self.gain_binaire(self.L_rendement, best_indice)
+            a_aleat = randint(0, self.nb_levier-1) # action à jouer choisie aléatoirement
+            stock = self.gain_binaire(self.L_rendement, a_aleat)
+            L_recompense[a_aleat] += stock
+            count += stock
+            self.actu_regret(timer, count, count_best, l_regret, l_time)
+            timer+=1
 
-def regret(ListLevier, L_played, T):
-    gain_aleat = 0
-    for i in range(T):
-        gain_aleat += jouer_levier(ListLevier, algo_alea(ListLevier))
-    print(gain_aleat)
+        plt.plot(l_time, l_regret)
+        plt.title("regret en fonction du temps algorithme aléatoire")
+        plt.ylabel("regret")
+        plt.xlabel("temps")
+        plt.show()
+        return count_best - count
 
-    gain_greed = 0
-    for i in range(T):
-        gain_greed += jouer_levier(ListLevier, algo_greed(ListLevier))
-    print(gain_greed)
+    def algo_greed(self, L_recompense, cpt_levier = {} ):
+        count_best = 0
+        count = 0
+        best_indice = np.argmax(self.L_rendement) # levier ayant le meilleur rendement
+        for i in range(self.t//3):
+            x = randint(0, self.nb_levier-1)
+            count_best += self.gain_binaire(self.L_rendement, best_indice)
+            stock = self.gain_binaire(self.L_rendement, x)
+            count += stock
+            L_recompense[x] += stock
+        best_to_play = np.argmax(L_recompense) # meilleure levier dans la nouvelle liste de rendement
 
-    gain_e_greed = 0
-    for i in range(T):
-        gain_e_greed += jouer_levier(ListLevier, algo_e_greed(ListLevier))
-    print(gain_e_greed)
+        for i in range(0, self.t-(self.t//3)):
+            count_best += self.gain_binaire(self.L_rendement, best_indice)
+            stock = self.gain_binaire(self.L_rendement, best_to_play)
+            count += stock
+            self.L_rendement[best_to_play] += stock
+        return (count_best - count, best_to_play)
 
-    gain_ucb = 0
-    for i in range(T):
-        gain_ucb += jouer_levier(ListLevier, algo_ucb(ListLevier, L_played))
-    print(gain_ucb)
+
+
+    def algo_greed_courbe(self, L_recompense, cpt_levier = {} ):
+        l_regret = list()
+        l_time = list()
+        timer = 0
+        count_best = 0
+        count = 0
+        best_indice = np.argmax(self.L_rendement) # levier ayant le meilleur rendement
+        for i in range(self.t//3):
+            x = randint(0, self.nb_levier-1)
+            count_best += self.gain_binaire(self.L_rendement, best_indice)
+            stock = self.gain_binaire(self.L_rendement, x)
+            count += stock
+            L_recompense[x] += stock
+            self.actu_regret(i, count, count_best, l_regret, l_time)
+            timer+=1
+        best_to_play = np.argmax(L_recompense) # meilleure levier dans la nouvelle liste de rendement
+
+        for i in range(0, self.t-(self.t//3)):
+            count_best += self.gain_binaire(self.L_rendement, best_indice)
+            stock = self.gain_binaire(self.L_rendement, best_to_play)
+            count += stock
+            self.L_rendement[best_to_play] += stock
+            self.actu_regret(timer, count, count_best, l_regret, l_time)
+            timer+=1
+
+        plt.plot(l_time, l_regret)
+        plt.title("regret en fonction du temps algorithme greedy")
+        plt.ylabel("regret")
+        plt.xlabel("temps")
+        plt.show()
+        return (count_best - count, best_to_play)
+
+
+    def algo_e_greed(self, L_recompense, nb=0):
+        l_regret = list()
+        l_time = list()
+        timer = 0
+        eps = 0.1
+        self.t
+        count_best = 0
+        count = 0
+        best_indice = np.argmax(self.L_rendement) # levier ayant le meilleur rendement
+
+        for i in range(self.t//3):
+            x = randint(0, self.nb_levier-1) # levier aleat deter
+            count_best += self.gain_binaire(self.L_rendement, best_indice) # on incrémente le compteur de gain plus opti
+            stock = self.gain_binaire(self.L_rendement, x) # determiner une action aléatoire
+            count += stock # on incrémente le compteur de gain pour action aleat
+            L_recompense[x] += stock
+            self.actu_regret(timer, count, count_best, l_regret, l_time)
+            timer+=1
+
+        for x in range(0, self.t-(self.t//3)):
+            # best action
+            count_best += self.gain_binaire(self.L_rendement, best_indice)
+            rand = random()
+            if rand < eps :
+                x = randint(0, self.nb_levier-1)
+                stock = self.gain_binaire(self.L_rendement, x)
+                count += stock
+                L_recompense[x] += stock
+                self.actu_regret(timer, count, count_best, l_regret, l_time)
+                timer+=1
+            else :
+                (gain_diff, to_play)= self.algo_greed(L_recompense)
+                y = self.gain_binaire(self.L_rendement, to_play)
+                count += y
+                L_recompense[to_play] += y
+                self.actu_regret(timer, count, count_best, l_regret, l_time)
+                timer+=1
+
+        plt.plot(l_time, l_regret)
+        plt.title("regret en fonction du temps algorithme E-greedy")
+        plt.ylabel("regret")
+        plt.xlabel("temps")
+        plt.show()
+        return count_best - count
+
+    def algo_ucb(self, L_recompense, L_played):
+        l_regret = list()
+        l_time = list()
+        timer = 0
+        count = 0
+        count_best = 0
+        best_indice = np.argmax(self.L_rendement)
+        nb_coup_tot = 0
+
+        for x in range(0,len(self.L_rendement)): # on suppose que tous les coups ont été joue au moins une fois
+            L_played[x]=1
+            nb_coup_tot += 1
+
+        for i in range(self.t//3): # exploration
+            x = randint(0, self.nb_levier-1)
+            count_best += self.gain_binaire(self.L_rendement, best_indice)
+            stock = self.gain_binaire(self.L_rendement, x)
+            count += stock
+            L_played[x] += 1
+            L_recompense[x] += stock
+            nb_coup_tot += 1
+            self.actu_regret(timer, count, count_best, l_regret, l_time)
+            timer+=1
+
+
+        for i in range(len(L_played)): # apply formule
+            L_recompense[i] = (L_recompense[i]/nb_coup_tot) + sqrt( 2 * log(nb_coup_tot)/ L_played[i])
+        to_play = np.argmax(L_recompense)
+
+        for x in range(0, self.t-(self.t//3)):
+            count_best += self.gain_binaire(self.L_rendement, best_indice)
+            count += self.gain_binaire(self.L_rendement, to_play)
+            self.actu_regret(timer, count, count_best, l_regret, l_time)
+            timer+=1
+
+        plt.plot(l_time, l_regret)
+        plt.title("regret en fonction du temps algorithme UCB")
+        plt.ylabel("regret")
+        plt.xlabel("temps")
+        plt.show()
+        return count_best-count
 
 
 class Joueur :
@@ -453,26 +558,39 @@ joueur2 = Joueur(-1)
 #---------------------------------------------------------------- PARTIE : 3 ----------------------------------------------------------------
 
 # nb iterations pour l'exploration pour algo greed
-greed_nb = 10
+nb_tirage = 100
 
 # nombre de parties à jouer
 T = 200
 
 # Nombre d'actions possibles
-taille_action = 1000
+taille_action = 100
 
 # determiner le nombre de fois Maximum que l'on peut jouer un levier
 max_lev = 100
 
-L = list()
-# Ui de chaque action
-for i in range(100):
-    L.append(random())
 
 # nombre de fois ou chaque levier a ete joue
-L_P = list()
-for i in range(100):
-    L_P.append(randint(0,taille_action ))
-    taille_action -= 1
+## def __init__(self, nb_action, nb_partie, List_modele=0 )
 
-regret(L,L_P,T)
+
+bandit = Bandits_manchots(100, 1000) # en 3 eme arg la List
+
+list_alea = [0 for i in range(bandit.nb_levier)]
+list_greed = [0 for i in range(bandit.nb_levier)]
+list_e_greed = [0 for i in range(bandit.nb_levier)]
+list_ucb = [0 for i in range(bandit.nb_levier)]
+
+list_cpt_alea = [0 for i in range(bandit.nb_levier)]
+list_cpt_greed = [0 for i in range(bandit.nb_levier)]
+list_cpt_e_greed = [0 for i in range(bandit.nb_levier)]
+list_cpt_ucb = [0 for i in range(bandit.nb_levier)]
+
+
+
+# print(bandit.algo_alea(list_alea))
+# (x,y) = bandit.algo_greed_courbe(list_greed)
+# print(x)
+# print(bandit.algo_e_greed(list_e_greed))
+for i in range(10):
+    print(bandit.algo_ucb(list_ucb, list_cpt_ucb))
